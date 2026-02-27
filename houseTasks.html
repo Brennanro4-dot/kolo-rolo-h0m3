@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master Home Hub | Protected</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --primary: #6366f1; --secondary: #a855f7; --success: #22c55e;
+            --danger: #f87171; --bg: #0f172a; --card: #1e293b; --text: #f8fafc;
+            --blue-accent: #005da4; --green-accent: #008c4e; --gold-accent: #ffcc00;
+        }
+
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; padding: 20px; margin: 0; min-height: 100vh; }
+        
+        #auth-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; width: 100%; }
+        #main-dashboard { display: none; width: 100%; max-width: 900px; background: var(--card); border-radius: 24px; padding: 30px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.05); margin-top: 20px; }
+        
+        /* Countdown Clock */
+        .countdown-container { background: rgba(0,0,0,0.3); border: 1px solid var(--gold-accent); border-radius: 15px; padding: 15px; margin-bottom: 25px; text-align: center; }
+        .countdown-timer { font-size: 1.8rem; font-weight: 900; color: var(--gold-accent); letter-spacing: 2px; text-shadow: 0 0 10px rgba(255, 204, 0, 0.3); }
+
+        .summary-bar { display: grid; grid-template-columns: 1fr 1fr 1fr; background: linear-gradient(135deg, var(--blue-accent), var(--green-accent)); padding: 25px; border-radius: 20px; margin-bottom: 35px; text-align: center; border-bottom: 5px solid var(--gold-accent); }
+        .summary-item label { display: block; font-size: 0.7rem; opacity: 0.9; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; color: white; }
+        .summary-item div { font-size: 1.4rem; font-weight: 800; color: white; }
+
+        .funding-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .source-card { background: rgba(255,255,255,0.03); padding: 12px; border-radius: 12px; border: 1px solid rgba(99, 102, 241, 0.2); text-align: center; }
+        .source-card input { background: #0f172a; border: 1px solid #334155; color: white; border-radius: 6px; width: 85%; padding: 8px; text-align: center; }
+
+        .section-title { color: var(--gold-accent); font-size: 0.85rem; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-top: 35px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: bold; }
+        .item-row { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); margin: 10px 0; padding: 12px 20px; border-radius: 12px; }
+        .cost-input { background: #0f172a; border: 1px solid #334155; color: var(--success); width: 110px; padding: 8px; border-radius: 6px; text-align: right; font-weight: bold; }
+
+        .task-form { display: grid; grid-template-columns: 2fr 1fr auto; gap: 10px; margin: 20px 0; }
+        .task-form input { background: #0f172a; border: 1px solid #475569; color: white; padding: 12px; border-radius: 8px; width: 100%; box-sizing: border-box; }
+        .btn-add { background: var(--gold-accent); color: black; font-weight: bold; padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; }
+        
+        .task-item { background: rgba(255,255,255,0.04); padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 4px solid var(--primary); display: flex; justify-content: space-between; align-items: center; }
+        .delete-btn { color: var(--danger); background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 0 5px; opacity: 0.6; transition: 0.2s; }
+        .delete-btn:hover { opacity: 1; transform: scale(1.2); }
+
+        #loader { position: fixed; top: 20px; right: 20px; background: var(--primary); color: white; padding: 8px 16px; border-radius: 50px; font-size: 0.75rem; font-weight: bold; display: none; z-index: 1000; }
+    </style>
+</head>
+<body onload="checkAuth()">
+
+<div id="loader">Syncing...</div>
+
+<div id="auth-screen">
+    <h2 style="color: var(--gold-accent)">🗝️ Secure Access</h2>
+    <input type="password" id="passInput" placeholder="Enter Password" style="padding:15px; border-radius:8px; border:none; margin-bottom:10px; width:250px; text-align:center; background: #1e293b; color: white;">
+    <button class="btn-add" onclick="verify()">Enter Hub</button>
+</div>
+
+<div id="main-dashboard">
+    <div class="countdown-container">
+        <label style="font-size: 0.7rem; text-transform: uppercase; color: #94a3b8; letter-spacing: 1px;">Move-In Countdown</label>
+        <div id="timer" class="countdown-timer">00d 00h 00m 00s</div>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h1 style="margin:0;">Home Hub 🗝️</h1>
+        <button onclick="refreshData()" style="background:none; border:1px solid #475569; color:#94a3b8; padding:5px 10px; border-radius:6px; cursor:pointer; font-size:0.7rem;">🔄 REFRESH</button>
+    </div>
+
+    <div class="summary-bar">
+        <div class="summary-item"><label>Total Savings</label><div id="total-cap">€0.00</div></div>
+        <div class="summary-item"><label>Total Costs</label><div id="total-out">€0.00</div></div>
+        <div class="summary-item"><label>Buffer</label><div id="remaining">€0.00</div></div>
+    </div>
+
+    <div class="funding-grid">
+        <div class="source-card"><label>Savings A</label><input type="number" id="s1" value="0" onchange="syncFinance()"></div>
+        <div class="source-card"><label>Savings B</label><input type="number" id="s2" value="0" onchange="syncFinance()"></div>
+        <div class="source-card"><label>Gifted</label><input type="number" id="s3" value="0" onchange="syncFinance()"></div>
+    </div>
+
+    <div class="section-title">🛋️ Furniture & Costs</div>
+    <div id="expense-list">
+        <div class="item-row"><span>Deposit Balance</span><input type="number" class="cost-input exp-val" value="0" onchange="syncFinance()"></div>
+        <div class="item-row"><span>Legal & Stamp</span><input type="number" class="cost-input exp-val" value="0" onchange="syncFinance()"></div>
+        <div class="item-row"><span>Floors</span><input type="number" class="cost-input exp-val" value="0" onchange="syncFinance()"></div>
+        <div class="item-row"><span>Sofa</span><input type="number" class="cost-input exp-val" value="0" onchange="syncFinance()"></div>
+        <div class="item-row"><span>Bed/Mattress</span><input type="number" class="cost-input exp-val" value="0" onchange="syncFinance()"></div>
+    </div>
+
+    <div class="section-title">📦 Moving Tasks</div>
+    <div class="task-form">
+        <input type="text" id="tDesc" placeholder="What needs doing?">
+        <input type="text" id="tRoom" placeholder="Room">
+        <button class="btn-add" onclick="addTask()">Add</button>
+    </div>
+    <div id="task-list"></div>
+</div>
+
+<script>
+    // --- CONFIGURATION ---
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzABgGc4PLAfdpn2zr9JHJyXJ_3pxldQ7R_ecv6Vh72bWm2ixWiAYeZYCml7FwTGCQSOA/exec";
+    const SHARED_PASSWORD = "Home2026"; 
+    const MOVE_IN_DATE = new Date("April 1, 2026 12:00:00").getTime(); 
+
+    // --- COUNTDOWN LOGIC ---
+    setInterval(function() {
+        const now = new Date().getTime();
+        const distance = MOVE_IN_DATE - now;
+        const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+        document.getElementById("timer").innerHTML = days + "d " + hours + "h " + minutes + "m " + seconds + "s ";
+    }, 1000);
+
+    // --- AUTH LOGIC ---
+    function checkAuth() {
+        if (sessionStorage.getItem('authenticated') === 'true') { showDashboard(); }
+    }
+    function verify() {
+        if (document.getElementById('passInput').value === SHARED_PASSWORD) {
+            sessionStorage.setItem('authenticated', 'true');
+            showDashboard();
+            confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+        } else { alert("Wrong password!"); }
+    }
+    function showDashboard() {
+        document.getElementById('auth-screen').style.display = 'none';
+        document.getElementById('main-dashboard').style.display = 'block';
+        refreshData();
+    }
+
+    // --- DATA LOGIC ---
+    async function refreshData() {
+        showLoader(true);
+        try {
+            const resp = await fetch(SCRIPT_URL);
+            const data = await resp.json();
+            
+            if(data.finance && data.finance.length >= 3) {
+                document.getElementById('s1').value = data.finance[0][1] || 0;
+                document.getElementById('s2').value = data.finance[1][1] || 0;
+                document.getElementById('s3').value = data.finance[2][1] || 0;
+                const expInputs = document.querySelectorAll('.exp-val');
+                expInputs.forEach((input, index) => {
+                    if(data.finance[index + 3]) input.value = data.finance[index + 3][1] || 0;
+                });
+            }
+
+            const list = document.getElementById('task-list');
+            list.innerHTML = data.tasks.reverse().map((t, idx) => `
+                <div class="task-item">
+                    <div>
+                        <div style="font-weight:bold;">${t[1]}</div>
+                        <div style="font-size:0.75rem; color:#94a3b8;">${t[2]}</div>
+                    </div>
+                    <button class="delete-btn" onclick="deleteTask('${t[0]}')">✕</button>
+                </div>
+            `).join('');
+
+            calculateTotals();
+        } catch (e) { console.error("Sync error", e); }
+        showLoader(false);
+    }
+
+    async function syncFinance() {
+        showLoader(true);
+        const fullData = [
+            ["Savings A", document.getElementById('s1').value],
+            ["Savings B", document.getElementById('s2').value],
+            ["Gifted", document.getElementById('s3').value]
+        ];
+        document.querySelectorAll('.item-row').forEach(row => {
+            fullData.push([row.querySelector('span').innerText, row.querySelector('.cost-input').value]);
+        });
+        await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ type: 'UPDATE_FINANCE', data: fullData }) });
+        calculateTotals();
+        setTimeout(showLoader, 1000, false);
+    }
+
+    async function addTask() {
+        const desc = document.getElementById('tDesc').value;
+        const room = document.getElementById('tRoom').value || 'General';
+        if(!desc) return;
+        showLoader(true);
+        await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ type: 'ADD_TASK', desc, room, prio: 'Standard' }) });
+        document.getElementById('tDesc').value = '';
+        setTimeout(refreshData, 1500);
+    }
+
+    async function deleteTask(taskId) {
+        if(!confirm("Delete this task?")) return;
+        showLoader(true);
+        // Note: This requires your Apps Script to handle a DELETE_TASK type
+        await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ type: 'DELETE_TASK', id: taskId }) });
+        setTimeout(refreshData, 1500);
+    }
+
+    function calculateTotals() {
+        const s1 = parseFloat(document.getElementById('s1').value) || 0;
+        const s2 = parseFloat(document.getElementById('s2').value) || 0;
+        const s3 = parseFloat(document.getElementById('s3').value) || 0;
+        const savings = s1 + s2 + s3;
+        let out = 0;
+        document.querySelectorAll('.exp-val').forEach(i => out += parseFloat(i.value) || 0);
+        const rem = savings - out;
+        document.getElementById('total-cap').innerText = "€" + savings.toLocaleString();
+        document.getElementById('total-out').innerText = "€" + out.toLocaleString();
+        document.getElementById('remaining').innerText = "€" + rem.toLocaleString();
+        document.getElementById('remaining').style.color = rem < 0 ? 'var(--danger)' : 'white';
+    }
+
+    function showLoader(show) { document.getElementById('loader').style.display = show ? 'block' : 'none'; }
+</script>
+</body>
+</html>
